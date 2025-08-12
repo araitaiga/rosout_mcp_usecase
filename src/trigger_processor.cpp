@@ -1,4 +1,7 @@
+#include <chrono>
+#include <future>
 #include <memory>
+#include <rclcpp/executors/multi_threaded_executor.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
@@ -49,7 +52,7 @@ private:
 
       // サブ処理用のトリガーサービスが利用可能かチェック
       RCLCPP_DEBUG(this->get_logger(), "Checking if sub trigger service is available...");
-      if (!sub_trigger_client_->wait_for_service(std::chrono::seconds(5))) {
+      if (!sub_trigger_client_->wait_for_service(std::chrono::seconds(10))) {
         RCLCPP_ERROR(this->get_logger(), "Sub trigger service is not available within timeout");
         response->success = false;
         response->message = "Main trigger failed: sub trigger service unavailable";
@@ -64,16 +67,15 @@ private:
       auto sub_request = std::make_shared<std_srvs::srv::Trigger::Request>();
       auto future = sub_trigger_client_->async_send_request(sub_request);
       RCLCPP_DEBUG(
-        this->get_logger(), "Request sent to sub trigger service, waiting for response...");
+        this->get_logger(),
+        "Request sent to sub trigger service, waiting for response with timeout...");
 
-      // 結果を待つ
-      RCLCPP_DEBUG(this->get_logger(), "Spinning until sub trigger service future completes...");
-      auto spin_result = rclcpp::spin_until_future_complete(this->shared_from_this(), future);
+      // 既存のエグゼキュータにノードが追加済みのため、spin_until_future_completeは使用しない
+      // マルチスレッドエグゼキュータでスピン中であれば、wait_forで応答を待てる
+      auto wait_status = future.wait_for(std::chrono::seconds(10));
 
-      if (spin_result == rclcpp::FutureReturnCode::SUCCESS) {
-        RCLCPP_DEBUG(
-          this->get_logger(),
-          "Sub trigger service future completed successfully, getting result...");
+      if (wait_status == std::future_status::ready) {
+        RCLCPP_DEBUG(this->get_logger(), "Sub trigger service future ready, getting result...");
         auto result = future.get();
 
         if (result->success) {
@@ -93,28 +95,21 @@ private:
             this->get_logger(),
             "=== Main trigger service request failed due to sub trigger failure ===");
         }
-      } else if (spin_result == rclcpp::FutureReturnCode::INTERRUPTED) {
-        RCLCPP_ERROR(this->get_logger(), "Sub trigger service call was interrupted");
-        response->success = false;
-        response->message = "Main trigger failed: sub trigger service call was interrupted";
+      } else if (wait_status == std::future_status::timeout) {
         RCLCPP_ERROR(
-          this->get_logger(), "=== Main trigger service request failed due to interruption ===");
-      } else if (spin_result == rclcpp::FutureReturnCode::TIMEOUT) {
-        RCLCPP_ERROR(this->get_logger(), "Sub trigger service call timed out");
+          this->get_logger(), "Sub trigger service call timed out while waiting for response");
         response->success = false;
         response->message = "Main trigger failed: sub trigger service call timed out";
         RCLCPP_ERROR(
           this->get_logger(), "=== Main trigger service request failed due to timeout ===");
-      } else {
+      } else {  // std::future_status::deferred など
         RCLCPP_ERROR(
-          this->get_logger(), "Sub trigger service call failed with unknown return code: %d",
-          static_cast<int>(spin_result));
+          this->get_logger(), "Sub trigger service call failed with unexpected future status");
         response->success = false;
-        response->message =
-          "Main trigger failed: sub trigger service call failed with unknown error";
+        response->message = "Main trigger failed: unexpected future status";
         RCLCPP_ERROR(
           this->get_logger(),
-          "=== Main trigger service request failed due to unknown spin error ===");
+          "=== Main trigger service request failed due to unexpected future status ===");
       }
 
     } catch (const std::exception & e) {
@@ -149,9 +144,13 @@ int main(int argc, char ** argv)
     auto node = std::make_shared<TriggerProcessorNode>();
     RCLCPP_INFO(rclcpp::get_logger("main"), "TriggerProcessorNode created successfully");
 
-    // ノードをスピンしてサービスリクエストを待つ
-    RCLCPP_INFO(rclcpp::get_logger("main"), "Starting to spin TriggerProcessorNode...");
-    rclcpp::spin(node);
+    // マルチスレッドエグゼキュータでスピン
+    RCLCPP_INFO(
+      rclcpp::get_logger("main"),
+      "Starting to spin TriggerProcessorNode with MultiThreadedExecutor...");
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(node);
+    executor.spin();
     RCLCPP_INFO(rclcpp::get_logger("main"), "TriggerProcessorNode spin completed");
 
   } catch (const std::exception & e) {
