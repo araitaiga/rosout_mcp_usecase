@@ -6,24 +6,14 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(std_srvs REQUIRED)
+find_package(ament_cmake_auto REQUIRED)
+ament_auto_find_build_dependencies()
 
 # Create trigger_processor executable
-add_executable(trigger_processor src/trigger_processor.cpp)
-ament_target_dependencies(trigger_processor rclcpp std_srvs)
+ament_auto_add_executable(trigger_processor src/trigger_processor.cpp)
 
 # Create sub_processor executable
-add_executable(sub_processor src/sub_processor.cpp)
-ament_target_dependencies(sub_processor rclcpp std_srvs)
-
-# Install executables
-install(TARGETS
-  trigger_processor
-  sub_processor
-  DESTINATION lib/${PROJECT_NAME}
-)
+ament_auto_add_executable(sub_processor src/sub_processor.cpp)
 
 # Install launch files
 install(DIRECTORY
@@ -31,4 +21,4 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
-ament_package()
+ament_auto_package()
