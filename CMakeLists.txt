@@ -9,8 +9,8 @@ endif()
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
-# Create trigger_processor executable
-ament_auto_add_executable(trigger_processor src/trigger_processor.cpp)
+# Create main_processor executable
+ament_auto_add_executable(main_processor src/main_processor.cpp)
 
 # Create sub_processor executable
 ament_auto_add_executable(sub_processor src/sub_processor.cpp)

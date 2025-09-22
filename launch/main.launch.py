@@ -9,8 +9,8 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='rosout_mcp_usecase',
-            executable='trigger_processor',
-            name='trigger_processor',
+            executable='main_processor',
+            name='main_processor',
             output='screen'
         ),
         Node(
