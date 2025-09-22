@@ -14,8 +14,8 @@ public:
     service_callback_group_ =
       this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
     // client_callback_group_ =
-    //   this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-    client_callback_group_ = service_callback_group_;
+    //   this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive); // NOTE: Deadlock is not occurred
+    client_callback_group_ = service_callback_group_;  // NOTE: Deadlock is occurred
 
     main_service_ = this->create_service<std_srvs::srv::Trigger>(
       "main_trigger",
